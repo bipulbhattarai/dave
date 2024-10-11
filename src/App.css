@@ -36,3 +36,11 @@
     transform: rotate(360deg);
   }
 }
+
+.backup-fail {
+  background-color: #ffcccc; /* Light red for fail */
+}
+
+.backup-success {
+  background-color: #ccffcc; /* Light green for success */
+}

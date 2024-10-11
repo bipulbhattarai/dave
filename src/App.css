@@ -44,3 +44,10 @@
 .backup-success {
   background-color: #ccffcc; /* Light green for success */
 }
+
+
+.custom-select .ant-select-selection-placeholder {
+  color: #004D40; /* Dark teal color */
+  font-family: 'YourFontFamily', sans-serif; /* Specify your desired font-family */
+  font-size: 16px; /* Optional: Adjust font size as needed */
+}

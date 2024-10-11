@@ -1,11 +1,13 @@
 import { message, Skeleton, Table, Select, Typography } from "antd";
 import { useEffect, useState } from "react";
+import '../src/App.css'; // Ensure this path is correct
+
 const { Option } = Select;
 
 const App = () => {
   const [tablesData, setTablesData] = useState({});
   const [loading, setLoading] = useState(false);
-  const [selectedTable, setSelectedTable] = useState("");
+  const [selectedTable, setSelectedTable] = useState(null); // Set to null for initial state
 
   useEffect(() => {
     setLoading(true);
@@ -15,9 +17,6 @@ const App = () => {
         setLoading(false);
         const groupedData = groupAndGenerateColumns(data);
         setTablesData(groupedData);
-        if (Object.keys(groupedData).length > 0) {
-          setSelectedTable(Object.keys(groupedData)[0]); // Default to first table
-        }
       })
       .catch(err => {
         setLoading(false);
@@ -61,8 +60,14 @@ const App = () => {
 
   return (
     <div>
-      <Typography.Title level={3} style={{ textAlign: 'center', color: '#004D40' }}>Dave - Dashboard</Typography.Title>
-      <Select defaultValue={selectedTable} style={{ width: 200, marginBottom: 20 }} onChange={handleTableChange}>
+      <Typography.Title level={3} style={{ textAlign: 'center', backgroundColor: '#004D40', color: '#fff', height: 50, display: 'flex', alignItems: 'center', padding: 10, fontSize: 20, fontWeight: '600', justifyContent: 'center' }}>Dave - Dashboard</Typography.Title>
+      <Select
+        value={selectedTable}
+        style={{ width: 200, marginBottom: 20 }}
+        onChange={handleTableChange}
+        placeholder="Select Module"
+        className="custom-select"
+      >
         {Object.keys(tablesData).map(tableName => (
           <Option key={tableName} value={tableName}>{tableName}</Option>
         ))}

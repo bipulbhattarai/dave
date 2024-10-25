@@ -11,7 +11,7 @@ const App = () => {
 
   useEffect(() => {
     setLoading(true);
-    fetch("https://ayr7fudi20.execute-api.us-east-1.amazonaws.com/Test-stage/data")
+    fetch("https://4fj5jg3ae6.execute-api.us-east-1.amazonaws.com/dev/")
       .then(res => res.json())
       .then(data => {
         setLoading(false);

@@ -139,3 +139,7 @@
   color: green;
   font-weight: bold;
 }
+
+.table-row:hover {
+  background-color: #e0f2f1; /* Light green hover color */
+}

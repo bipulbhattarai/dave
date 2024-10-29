@@ -2,52 +2,140 @@
   text-align: center;
 }
 
-.App-logo {
-  height: 40vmin;
-  pointer-events: none;
+.App-title {
+  font-family: 'Arial', sans-serif;
+  font-size: 2rem;
+  font-weight: bold;
+  color: #333;
+  margin-bottom: 20px;
 }
 
-@media (prefers-reduced-motion: no-preference) {
-  .App-logo {
-    animation: App-logo-spin infinite 20s linear;
+.App-table {
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.Table-header {
+  background-color: #f5f5f5;
+  font-weight: bold;
+  font-size: 1rem;
+  color: #555;
+  padding: 10px;
+}
+
+.Table-row {
+  transition: background-color 0.3s ease;
+}
+
+.Table-row:hover {
+  background-color: #f0f0f0;
+}
+
+.Table-cell {
+  padding: 10px;
+  font-size: 0.9rem;
+  color: #444;
+}
+
+@media (max-width: 768px) {
+  .App {
+    padding: 10px;
+  }
+
+  .App-title {
+    font-size: 1.5rem;
+  }
+
+  .Table-cell {
+    font-size: 0.8rem;
   }
 }
 
-.App-header {
-  background-color: #282c34;
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  font-size: calc(10px + 2vmin);
-  color: white;
+.Column-filter {
+  font-size: 0.85rem;
+  padding: 2px 5px;
 }
 
-.App-link {
-  color: #61dafb;
+/* App.css */
+
+.App {
+  font-family: Arial, sans-serif;
+  padding: 20px;
 }
 
-@keyframes App-logo-spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
+.App-title {
+  text-align: center;
+  margin-bottom: 20px;
+}
+
+.App-filter {
+  margin-bottom: 20px;
+}
+
+.App-table {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+.Table-header {
+  background-color: #b6b9b9; /* Header background color */
+  color: white; /* Header text color */
+  text-align: left;
+  padding: 8px;
+}
+
+.Table-row {
+  transition: background-color 0.3s; /* Smooth transition for hover effect */
+}
+
+.Table-row:nth-child(even) {
+  background-color: #f2f2f2; /* Light grey for even rows */
+}
+
+.Table-row:nth-child(odd) {
+  background-color: white; /* White for odd rows */
+}
+
+.Table-row:hover {
+  background-color: #ddd; /* Light grey on hover */
+}
+
+.Table-cell {
+  padding: 8px;
+  border-bottom: 1px solid #ddd; /* Border between rows */
+}
+
+.custom-select {
+  border-radius: 8px;
 }
 
 .backup-fail {
-  background-color: #ffcccc; /* Light red for fail */
+  background-color: #bcabab;
 }
 
 .backup-success {
-  background-color: #ccffcc; /* Light green for success */
+  background-color: #e6ffe6;
 }
 
+.custom-select {
+  border-radius: 8px;
+}
 
-.custom-select .ant-select-selection-placeholder {
-  color: #004D40; /* Dark teal color */
-  font-family: 'YourFontFamily', sans-serif; /* Specify your desired font-family */
-  font-size: 16px; /* Optional: Adjust font size as needed */
+.backup-fail {
+  background-color: #ece5e5;
+}
+
+.backup-success {
+  background-color: #e6ffe6; 
+}
+
+.backup-status-fail {
+  color: rgb(227, 22, 22);
+  font-weight: bold;
+}
+
+.backup-status-success {
+  color: green;
+  font-weight: bold;
 }

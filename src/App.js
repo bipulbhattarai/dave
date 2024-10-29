@@ -13,28 +13,27 @@ import {
   Paper,
   CircularProgress,
   Tooltip,
-  Snackbar,
   IconButton,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  Button,
-  Alert,
   Chip,
   Switch,
   TablePagination,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Button,
+  Snackbar,
+  Alert,
 } from "@mui/material";
 import { createTheme, ThemeProvider, styled } from "@mui/material/styles";
 import { motion } from "framer-motion";
-import CloseIcon from "@mui/icons-material/Close";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import DownloadIcon from "@mui/icons-material/Download";
 import SearchIcon from "@mui/icons-material/Search";
+import CloseIcon from "@mui/icons-material/Close";
 import { json2csv } from "json-2-csv";
-import "../src/App.css";
-import "@fontsource/poppins"; // Import Google Font 'Poppins'
+import "@fontsource/poppins";
 
-// Define custom styled components with MUI's styled utility
 const DashboardContainer = styled("div")(({ theme }) => ({
   padding: 20,
   minHeight: "100vh",
@@ -48,7 +47,34 @@ const TitleContainer = styled("div")({
   justifyContent: "center",
   alignItems: "center",
   marginBottom: 20,
-  position: "relative",
+  padding: "15px 0",
+  backgroundColor: "#036649",
+  borderRadius: "8px",
+  color: "#ffffff",
+});
+
+const Logo = styled("div")({
+  display: "flex",
+  alignItems: "center",
+  gap: "10px",
+  fontWeight: "bold",
+  fontSize: "1.2rem",
+});
+
+const LogoIcon = () => (
+  <svg width="40" height="40" viewBox="0 0 24 24" fill="#ffffff" xmlns="http://www.w3.org/2000/svg">
+    <circle cx="12" cy="12" r="10" stroke="#ffffff" strokeWidth="2" fill="#ffffff" />
+    <text x="12" y="16" textAnchor="middle" fill="#036649" fontSize="10px" fontWeight="bold">DD</text>
+  </svg>
+);
+
+const FooterContainer = styled("footer")({
+  backgroundColor: "#036649",
+  color: "#ffffff",
+  padding: "15px",
+  textAlign: "center",
+  marginTop: "20px",
+  fontSize: "0.9rem",
 });
 
 const ControlsContainer = styled("div")(({ theme }) => ({
@@ -71,28 +97,24 @@ const EnhancedButton = styled(IconButton)(({ theme }) => ({
 }));
 
 const Title = styled(Typography)(({ theme }) => ({
-  backgroundColor: "#036649",
   color: "#ffffff",
-  padding: "12px 0",
-  borderRadius: "8px",
   fontWeight: "bold",
-  textAlign: "center",
-  width: "100%",
+  fontSize: "1.5rem",
   fontFamily: "Poppins, sans-serif",
 }));
 
 const App = () => {
   const [tablesData, setTablesData] = useState({});
+  const [filteredData, setFilteredData] = useState({});
   const [loading, setLoading] = useState(false);
   const [loadingPage, setLoadingPage] = useState(true);
   const [selectedTable, setSelectedTable] = useState("");
   const [searchText, setSearchText] = useState("");
   const [darkMode, setDarkMode] = useState(false);
-  const [openSnackbar, setOpenSnackbar] = useState(false);
-  const [openDetails, setOpenDetails] = useState(false);
+  const [openDialog, setOpenDialog] = useState(false);
   const [selectedRow, setSelectedRow] = useState(null);
+  const [openSnackbar, setOpenSnackbar] = useState(false);
   const [alertMessage, setAlertMessage] = useState("");
-  const [openAlertSnackbar, setOpenAlertSnackbar] = useState(false);
 
   // Pagination states
   const [page, setPage] = useState(0);
@@ -105,15 +127,22 @@ const App = () => {
     }, 1500);
   }, []);
 
+  useEffect(() => {
+    if (selectedTable) {
+      handleSearch();
+    }
+  }, [searchText, selectedTable, tablesData]);
+
   const fetchData = () => {
     setLoading(true);
     fetch("https://o2merk3yse.execute-api.us-east-1.amazonaws.com/dev/data")
       .then((res) => res.json())
       .then((data) => {
         setLoading(false);
-        setOpenSnackbar(true);
         const groupedData = groupAndGenerateColumns(data);
         setTablesData(groupedData);
+        setFilteredData(groupedData);
+        checkForCriticalData(groupedData);
       })
       .catch((err) => {
         setLoading(false);
@@ -147,9 +176,41 @@ const App = () => {
     return groups;
   };
 
-  const handleCloseSnackbar = () => setOpenSnackbar(false);
-  const handleCloseAlertSnackbar = () => setOpenAlertSnackbar(false);
-  const handleCloseDetails = () => setOpenDetails(false);
+  const checkForCriticalData = (data) => {
+    let foundCriticalData = false;
+
+    Object.keys(data).forEach((tableName) => {
+      data[tableName].data.forEach((row) => {
+        if (row.backup_status === "Fail") {
+          foundCriticalData = true;
+        }
+      });
+    });
+
+    if (foundCriticalData) {
+      setAlertMessage("Critical alert: 'Fail' statuses found in the data!");
+      setOpenSnackbar(true);
+    }
+  };
+
+  const handleSearch = () => {
+    if (!selectedTable) return;
+
+    const tableData = tablesData[selectedTable].data;
+    const filteredTableData = tableData.filter((item) =>
+      Object.values(item).some((value) =>
+        value && value.toString().toLowerCase().includes(searchText.toLowerCase())
+      )
+    );
+
+    setFilteredData({
+      ...filteredData,
+      [selectedTable]: { ...filteredData[selectedTable], data: filteredTableData },
+    });
+    setPage(0); // Reset to the first page on new search
+  };
+
+  const handleSnackbarClose = () => setOpenSnackbar(false);
 
   const lightTheme = createTheme({
     palette: {
@@ -175,7 +236,14 @@ const App = () => {
   const handleDarkModeToggle = () => setDarkMode(!darkMode);
 
   const handleChangePage = (event, newPage) => setPage(newPage);
-  const handleChangeRowsPerPage = (event) => setRowsPerPage(parseInt(event.target.value, 10));
+  const handleChangeRowsPerPage = (event) => {
+    setRowsPerPage(parseInt(event.target.value, 10));
+    setPage(0); // Reset to the first page on rows per page change
+  };
+
+  const paginatedData = selectedTable
+    ? filteredData[selectedTable]?.data.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
+    : [];
 
   const exportToCSV = async () => {
     const csvData = await json2csv(tablesData[selectedTable]?.data || []);
@@ -185,6 +253,16 @@ const App = () => {
     link.href = url;
     link.download = "filtered_data.csv";
     link.click();
+  };
+
+  const handleRowClick = (row) => {
+    setSelectedRow(row);
+    setOpenDialog(true);
+  };
+
+  const handleCloseDialog = () => {
+    setOpenDialog(false);
+    setSelectedRow(null);
   };
 
   if (loadingPage) {
@@ -207,15 +285,21 @@ const App = () => {
     <ThemeProvider theme={darkMode ? darkTheme : lightTheme}>
       <DashboardContainer>
         <TitleContainer>
-          <Title variant="h4">Dave - Dashboard</Title>
-          <div style={{ position: "absolute", right: 0 }}>
-            <Typography variant="body1" style={{ color: "#ffffff", marginRight: 8 }}>
+          <Logo>
+            <LogoIcon />
+            <Title variant="h5">Dave - Dashboard</Title>
+          </Logo>
+          <div style={{ position: "absolute", right: 0, display: "flex", alignItems: "center" }}>
+            <Typography
+              variant="body2"
+              style={{ color: "#ffffff", marginRight: 8, fontSize: "0.85rem" }}
+            >
               Dark Mode
             </Typography>
             <Switch
               checked={darkMode}
               onChange={handleDarkModeToggle}
-              color="default" // Set toggle switch to white in dark mode
+              color="default"
               sx={{
                 "& .MuiSwitch-switchBase.Mui-checked": {
                   color: "#ffffff",
@@ -289,19 +373,33 @@ const App = () => {
         {loading ? (
           <CircularProgress style={{ display: "block", margin: "20px auto", color: darkMode ? "#bb86fc" : "#036649" }} />
         ) : (
-          <TableContainer component={Paper} style={{ borderRadius: "8px", backgroundColor: darkMode ? "#333333" : "#ffffff", boxShadow: darkMode ? "0px 4px 8px rgba(0, 0, 0, 0.3)" : "0px 4px 8px rgba(0, 0, 0, 0.1)" }}>
+          <TableContainer
+            component={Paper}
+            style={{
+              borderRadius: "8px",
+              backgroundColor: darkMode ? "#333333" : "#ffffff",
+              boxShadow: darkMode ? "0px 4px 8px rgba(0, 0, 0, 0.3)" : "0px 4px 8px rgba(0, 0, 0, 0.1)",
+            }}
+          >
             <Table>
               <TableHead>
-                <TableRow style={{ backgroundColor: darkMode ? "#333333" : "#036649" }}>
+                <TableRow style={{ backgroundColor: "#036649" }}>
                   {tablesData[selectedTable]?.columns.map((col) => (
-                    <TableCell key={col.key} style={{ color: darkMode ? "#ffffff" : "#ffffff", fontWeight: "bold" }}>
+                    <TableCell
+                      key={col.key}
+                      style={{
+                        color: "#ffffff",
+                        fontWeight: "bold",
+                        padding: "8px",
+                      }}
+                    >
                       {col.title}
                     </TableCell>
                   ))}
                 </TableRow>
               </TableHead>
               <TableBody>
-                {(tablesData[selectedTable]?.data || []).map((row, rowIndex) => (
+                {paginatedData.map((row, rowIndex) => (
                   <TableRow
                     key={rowIndex}
                     component={motion.tr}
@@ -311,10 +409,22 @@ const App = () => {
                     style={{
                       backgroundColor: darkMode ? "#333333" : "#ffffff",
                       cursor: "pointer",
+                      transition: "background-color 0.3s ease",
                     }}
+                    onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = darkMode ? "#444444" : "#f1f1f1")}
+                    onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = darkMode ? "#333333" : "#ffffff")}
+                    onClick={() => handleRowClick(row)}
                   >
                     {tablesData[selectedTable]?.columns.map((col) => (
-                      <TableCell key={col.key}>
+                      <TableCell
+                        key={col.key}
+                        style={{
+                          padding: "8px",
+                          maxWidth: "300px",
+                          whiteSpace: "normal",
+                          wordBreak: "break-word",
+                        }}
+                      >
                         {col.key === "backup_status" ? (
                           <Chip
                             label={row[col.key]}
@@ -333,7 +443,7 @@ const App = () => {
             <TablePagination
               rowsPerPageOptions={[5, 10, 25]}
               component="div"
-              count={(tablesData[selectedTable]?.data || []).length}
+              count={(filteredData[selectedTable]?.data || []).length}
               rowsPerPage={rowsPerPage}
               page={page}
               onPageChange={handleChangePage}
@@ -342,6 +452,46 @@ const App = () => {
             />
           </TableContainer>
         )}
+
+        <Dialog open={openDialog} onClose={handleCloseDialog} fullWidth maxWidth="sm">
+          <DialogTitle>
+            Row Details
+            <IconButton onClick={handleCloseDialog} style={{ position: "absolute", right: 10, top: 10 }}>
+              <CloseIcon />
+            </IconButton>
+          </DialogTitle>
+          <DialogContent dividers>
+            {selectedRow &&
+              Object.entries(selectedRow).map(([key, value]) => (
+                <Typography key={key} style={{ marginBottom: 10 }}>
+                  <strong>{key.replace(/_/g, " ")}:</strong> {value}
+                </Typography>
+              ))}
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={handleCloseDialog} color="primary">
+              Close
+            </Button>
+          </DialogActions>
+        </Dialog>
+
+        <Snackbar
+          open={openSnackbar}
+          autoHideDuration={5000}
+          onClose={handleSnackbarClose}
+          anchorOrigin={{ vertical: "top", horizontal: "center" }}
+        >
+          <Alert onClose={handleSnackbarClose} severity="error" sx={{ width: "100%" }}>
+            {alertMessage}
+          </Alert>
+        </Snackbar>
+
+        <FooterContainer>
+          <Typography variant="body2">© 2024 Dave Dashboard | Streamlined Data Insights</Typography>
+          <Typography variant="body2" style={{ fontSize: "0.8rem" }}>
+            Built with ♥ by the Dave Dashboard Team
+          </Typography>
+        </FooterContainer>
       </DashboardContainer>
     </ThemeProvider>
   );

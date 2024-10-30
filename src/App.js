@@ -489,7 +489,7 @@ const App = () => {
         <FooterContainer>
           <Typography variant="body2">© 2024 Dave Dashboard | Streamlined Data Insights</Typography>
           <Typography variant="body2" style={{ fontSize: "0.8rem" }}>
-            Built with ♥ by the Dave Dashboard Team
+            Built by IT Team
           </Typography>
         </FooterContainer>
       </DashboardContainer>

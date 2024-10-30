@@ -35,7 +35,7 @@ import { json2csv } from "json-2-csv";
 import "@fontsource/poppins";
 
 const DashboardContainer = styled("div")(({ theme }) => ({
-  padding: 20,
+  padding: 9,
   minHeight: "100vh",
   backgroundColor: theme.palette.background.default,
   color: theme.palette.text.primary,

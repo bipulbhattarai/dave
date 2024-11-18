@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from "react";
 import {
   Typography,
   Select,
@@ -23,16 +23,16 @@ import {
   DialogActions,
   Button,
   Snackbar,
-  Alert
-} from '@mui/material';
-import { createTheme, ThemeProvider, styled } from '@mui/material/styles';
-import { motion } from 'framer-motion';
-import RefreshIcon from '@mui/icons-material/Refresh';
-import DownloadIcon from '@mui/icons-material/Download';
-import SearchIcon from '@mui/icons-material/Search';
-import CloseIcon from '@mui/icons-material/Close';
-import { json2csv } from 'json-2-csv';
-import '@fontsource/poppins';
+  Alert,
+} from "@mui/material";
+import { createTheme, ThemeProvider, styled } from "@mui/material/styles";
+import { motion } from "framer-motion";
+import RefreshIcon from "@mui/icons-material/Refresh";
+import DownloadIcon from "@mui/icons-material/Download";
+import SearchIcon from "@mui/icons-material/Search";
+import CloseIcon from "@mui/icons-material/Close";
+import { json2csv } from "json-2-csv";
+import "@fontsource/poppins";
 
 const DashboardContainer = styled("div")(({ theme }) => ({
   padding: 9,
@@ -115,8 +115,102 @@ const App = () => {
   const [selectedRow, setSelectedRow] = useState(null);
   const [openSnackbar, setOpenSnackbar] = useState(false);
   const [alertMessage, setAlertMessage] = useState("");
+
+  // Pagination states
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
+
+  useEffect(() => {
+    setTimeout(() => {
+      fetchData();
+      setLoadingPage(false);
+    }, 1500);
+  }, []);
+
+  useEffect(() => {
+    if (selectedTable) {
+      handleSearch();
+    }
+  }, [searchText, selectedTable, tablesData]);
+
+  const fetchData = () => {
+    setLoading(true);
+    fetch("https://o2merk3yse.execute-api.us-east-1.amazonaws.com/dev/data")
+      .then((res) => res.json())
+      .then((data) => {
+        setLoading(false);
+        const groupedData = groupAndGenerateColumns(data);
+        setTablesData(groupedData);
+        setFilteredData(groupedData);
+        checkForCriticalData(groupedData);
+      })
+      .catch((err) => {
+        setLoading(false);
+        console.error("Couldn't fetch data", err);
+      });
+  };
+
+  const groupAndGenerateColumns = (data) => {
+    const groups = data.reduce((acc, item) => {
+      const tableName = item.table_name;
+      if (!acc[tableName]) {
+        acc[tableName] = { data: [], keys: new Set() };
+      }
+      acc[tableName].data.push(item);
+      Object.keys(item).forEach((key) => {
+        if (key !== "table_name") acc[tableName].keys.add(key);
+      });
+      return acc;
+    }, {});
+
+    Object.keys(groups).forEach((tableName) => {
+      groups[tableName].columns = Array.from(groups[tableName].keys).map(
+        (key) => ({
+          title: key.replace(/_/g, " ").replace(/\b\w/g, (l) => l.toUpperCase()),
+          dataIndex: key,
+          key: key,
+        })
+      );
+    });
+
+    return groups;
+  };
+
+  const checkForCriticalData = (data) => {
+    let foundCriticalData = false;
+
+    Object.keys(data).forEach((tableName) => {
+      data[tableName].data.forEach((row) => {
+        if (row.backup_status === "Fail") {
+          foundCriticalData = true;
+        }
+      });
+    });
+
+    if (foundCriticalData) {
+      setAlertMessage("Critical alert: 'Fail' statuses found in the data!");
+      setOpenSnackbar(true);
+    }
+  };
+
+  const handleSearch = () => {
+    if (!selectedTable) return;
+
+    const tableData = tablesData[selectedTable].data;
+    const filteredTableData = tableData.filter((item) =>
+      Object.values(item).some((value) =>
+        value && value.toString().toLowerCase().includes(searchText.toLowerCase())
+      )
+    );
+
+    setFilteredData({
+      ...filteredData,
+      [selectedTable]: { ...filteredData[selectedTable], data: filteredTableData },
+    });
+    setPage(0); // Reset to the first page on new search
+  };
+
+  const handleSnackbarClose = () => setOpenSnackbar(false);
 
   const lightTheme = createTheme({
     palette: {
@@ -138,132 +232,27 @@ const App = () => {
       fontFamily: "Poppins, sans-serif",
     },
   });
-const fetchData = () => {
-    setLoading(true);
-    fetch("https://o2merk3yse.execute-api.us-east-1.amazonaws.com/dev/data")
-      .then((res) => res.json())
-      .then((data) => {
-        setLoading(false);
-        const groupedData = groupAndGenerateColumns(data);
-        setTablesData(groupedData);
-        setFilteredData(groupedData);
-        checkForCriticalData(groupedData);
-      })
-      .catch((err) => {
-        setLoading(false);
-        console.error("Couldn't fetch data", err);
-      });
-  };
-
-  const groupAndGenerateColumns = (data) => {
-    const groups = data.reduce((acc, item) => {
-      const tableName = item.table_name || getDetermineTableType(item);
-      if (!acc[tableName]) {
-        acc[tableName] = { data: [], keys: new Set() };
-      }
-      
-      const { table_name, ...itemWithoutTableName } = item;
-      acc[tableName].data.push(itemWithoutTableName);
-      
-      Object.keys(itemWithoutTableName).forEach((key) => {
-        acc[tableName].keys.add(key);
-      });
-      return acc;
-    }, {});
-
-    const columnConfigs = {
-      backup_status: {
-        order: ['hostname', 'backup_status', 'last_backup_date', 'next_backup_date'],
-        titles: {
-          hostname: 'Hostname',
-          backup_status: 'Backup Status',
-          last_backup_date: 'Last Backup Date',
-          next_backup_date: 'Next Backup Date'
-        }
-      },
-      ssl_status: {
-        order: ['domain', 'certificate_issued', 'certificate_expiry', 'days_to_expiry', 'status', 'check_date'],
-        titles: {
-          domain: 'Domain',
-          certificate_issued: 'Certificate Issued',
-          certificate_expiry: 'Certificate Expiry',
-          days_to_expiry: 'Days to Expiry',
-          status: 'Status',
-          check_date: 'Last Check Date'
-        }
-      }
-    };
-
-    Object.keys(groups).forEach((tableName) => {
-      const config = columnConfigs[tableName];
-      if (config) {
-        groups[tableName].columns = config.order
-          .filter(key => groups[tableName].keys.has(key))
-          .map(key => ({
-            title: config.titles[key] || key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
-            dataIndex: key,
-            key: key
-          }));
-      } else {
-        groups[tableName].columns = Array.from(groups[tableName].keys).map(key => ({
-          title: key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
-          dataIndex: key,
-          key: key
-        }));
-      }
-    });
-
-    return groups;
-  };
-
-  const getDetermineTableType = (item) => {
-    if (item.hasOwnProperty('backup_status')) {
-      return 'backup_status';
-    }
-    if (item.hasOwnProperty('certificate_expiry') || item.hasOwnProperty('days_to_expiry')) {
-      return 'ssl_status';
-    }
-    return 'unknown';
-  };
-
-  const checkForCriticalData = (data) => {
-    let foundCriticalData = false;
-    Object.keys(data).forEach((tableName) => {
-      data[tableName].data.forEach((row) => {
-        if (row.backup_status === "Fail" || row.status === "expired") {
-          foundCriticalData = true;
-        }
-      });
-    });
-
-    if (foundCriticalData) {
-      setAlertMessage("Critical alert: Failed backups or expired certificates found!");
-      setOpenSnackbar(true);
-    }
-  };
-
-  const handleSearch = () => {
-    if (!selectedTable) return;
-
-    const tableData = tablesData[selectedTable]?.data || [];
-    const filteredTableData = tableData.filter((item) =>
-      Object.values(item).some((value) =>
-        value && value.toString().toLowerCase().includes(searchText.toLowerCase())
-      )
-    );
-
-    setFilteredData({
-      ...filteredData,
-      [selectedTable]: { ...tablesData[selectedTable], data: filteredTableData },
-    });
-    setPage(0);
-  };
 
   const handleDarkModeToggle = () => setDarkMode(!darkMode);
+
   const handleChangePage = (event, newPage) => setPage(newPage);
   const handleChangeRowsPerPage = (event) => {
     setRowsPerPage(parseInt(event.target.value, 10));
-    setPage(0);
+    setPage(0); // Reset to the first page on rows per page change
+  };
+
+  const paginatedData = selectedTable
+    ? filteredData[selectedTable]?.data.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
+    : [];
+
+  const exportToCSV = async () => {
+    const csvData = await json2csv(tablesData[selectedTable]?.data || []);
+    const blob = new Blob([csvData], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "filtered_data.csv";
+    link.click();
   };
 
   const handleRowClick = (row) => {
@@ -276,53 +265,13 @@ const fetchData = () => {
     setSelectedRow(null);
   };
 
-  const handleSnackbarClose = () => setOpenSnackbar(false);
-
-  const exportToCSV = async () => {
-    if (!selectedTable || !tablesData[selectedTable]) return;
-    
-    const csvData = await json2csv(tablesData[selectedTable].data || []);
-    const blob = new Blob([csvData], { type: "text/csv" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `${selectedTable}_data.csv`;
-    link.click();
-  };
-
-  useEffect(() => {
-    setTimeout(() => {
-      fetchData();
-      setLoadingPage(false);
-    }, 1500);
-  }, []);
-
-  useEffect(() => {
-    if (selectedTable) {
-      handleSearch();
-    }
-  }, [searchText, selectedTable, tablesData]);
-
-  const paginatedData = selectedTable
-    ? (filteredData[selectedTable]?.data || []).slice(
-        page * rowsPerPage,
-        page * rowsPerPage + rowsPerPage
-      )
-    : [];
-
   if (loadingPage) {
     return (
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ duration: 0.5 }}
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          height: "100vh",
-          backgroundColor: "#036649",
-        }}
+        style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100vh", backgroundColor: "#036649" }}
       >
         <Typography variant="h4" style={{ color: "#ffffff", marginBottom: 20 }}>
           Welcome to Dave Dashboard
@@ -341,7 +290,10 @@ const fetchData = () => {
             <Title variant="h5">Dave - Dashboard</Title>
           </Logo>
           <div style={{ position: "absolute", right: 0, display: "flex", alignItems: "center" }}>
-            <Typography variant="body2" style={{ color: "#ffffff", marginRight: 8, fontSize: "0.85rem" }}>
+            <Typography
+              variant="body2"
+              style={{ color: "#ffffff", marginRight: 8, fontSize: "0.85rem" }}
+            >
               Dark Mode
             </Typography>
             <Switch
@@ -378,7 +330,7 @@ const fetchData = () => {
               </MenuItem>
               {Object.keys(tablesData).map((tableName) => (
                 <MenuItem key={tableName} value={tableName}>
-                  {tableName.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                  {tableName}
                 </MenuItem>
               ))}
             </Select>
@@ -419,28 +371,20 @@ const fetchData = () => {
         </ControlsContainer>
 
         {loading ? (
-          <CircularProgress
-            style={{
-              display: "block",
-              margin: "20px auto",
-              color: darkMode ? "#bb86fc" : "#036649",
-            }}
-          />
+          <CircularProgress style={{ display: "block", margin: "20px auto", color: darkMode ? "#bb86fc" : "#036649" }} />
         ) : (
           <TableContainer
             component={Paper}
             style={{
               borderRadius: "8px",
               backgroundColor: darkMode ? "#333333" : "#ffffff",
-              boxShadow: darkMode
-                ? "0px 4px 8px rgba(0, 0, 0, 0.3)"
-                : "0px 4px 8px rgba(0, 0, 0, 0.1)",
+              boxShadow: darkMode ? "0px 4px 8px rgba(0, 0, 0, 0.3)" : "0px 4px 8px rgba(0, 0, 0, 0.1)",
             }}
           >
             <Table>
               <TableHead>
                 <TableRow style={{ backgroundColor: "#036649" }}>
-                  {selectedTable && tablesData[selectedTable]?.columns.map((col) => (
+                  {tablesData[selectedTable]?.columns.map((col) => (
                     <TableCell
                       key={col.key}
                       style={{
@@ -481,10 +425,10 @@ const fetchData = () => {
                           wordBreak: "break-word",
                         }}
                       >
-                        {col.key === "backup_status" || col.key === "status" ? (
+                        {col.key === "backup_status" ? (
                           <Chip
                             label={row[col.key]}
-                            color={row[col.key] === "Fail" || row[col.key] === "expired" ? "error" : "success"}
+                            color={row[col.key] === "Fail" ? "error" : "success"}
                             style={{ fontWeight: "bold", color: "#ffffff" }}
                           />
                         ) : (
@@ -512,10 +456,7 @@ const fetchData = () => {
         <Dialog open={openDialog} onClose={handleCloseDialog} fullWidth maxWidth="sm">
           <DialogTitle>
             Row Details
-            <IconButton 
-              onClick={handleCloseDialog} 
-              style={{ position: "absolute", right: 10, top: 10 }}
-            >
+            <IconButton onClick={handleCloseDialog} style={{ position: "absolute", right: 10, top: 10 }}>
               <CloseIcon />
             </IconButton>
           </DialogTitle>
@@ -546,9 +487,7 @@ const fetchData = () => {
         </Snackbar>
 
         <FooterContainer>
-          <Typography variant="body2">
-            © 2024 Dave Dashboard | Streamlined Data Insights
-          </Typography>
+          <Typography variant="body2">© 2024 Dave Dashboard | Streamlined Data Insights</Typography>
           <Typography variant="body2" style={{ fontSize: "0.8rem" }}>
             Built by IT Team
           </Typography>

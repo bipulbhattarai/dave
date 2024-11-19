@@ -34,7 +34,6 @@ import CloseIcon from '@mui/icons-material/Close';
 import { json2csv } from 'json-2-csv';
 import '@fontsource/poppins';
 
-// Styled Components
 const DashboardContainer = styled("div")(({ theme }) => ({
   padding: 9,
   minHeight: "100vh",
@@ -52,7 +51,6 @@ const TitleContainer = styled("div")({
   backgroundColor: "#036649",
   borderRadius: "8px",
   color: "#ffffff",
-  position: "relative",
 });
 
 const Logo = styled("div")({
@@ -105,20 +103,6 @@ const Title = styled(Typography)(({ theme }) => ({
   fontFamily: "Poppins, sans-serif",
 }));
 
-// Helper function to format field names
-const formatFieldName = (field) => {
-  return field
-    .replace(/_/g, ' ')
-    .replace(/\b\w/g, l => l.toUpperCase())
-    .trim();
-};
-
-// Helper function to determine if a field should be hidden
-const isHiddenField = (field) => {
-  const hiddenFields = ['table_name', 'id', '_id'];
-  return hiddenFields.includes(field.toLowerCase());
-};
-
 const App = () => {
   const [tablesData, setTablesData] = useState({});
   const [filteredData, setFilteredData] = useState({});
@@ -134,13 +118,13 @@ const App = () => {
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
 
-  // Theme configurations
   const lightTheme = createTheme({
     palette: {
       mode: "light",
       primary: { main: "#036649" },
       secondary: { main: "#00a676" },
       background: { default: "#f3f3f3" },
+      fontFamily: "Poppins, sans-serif",
     },
   });
 
@@ -151,120 +135,111 @@ const App = () => {
       secondary: { main: "#00a676" },
       background: { default: "#121212" },
       text: { primary: "#ffffff" },
+      fontFamily: "Poppins, sans-serif",
     },
   });
-
-  const detectColumnType = (key, value) => {
-    if (key.toLowerCase().includes('status')) return 'status';
-    if (key.toLowerCase().includes('date') || key.toLowerCase().includes('time')) return 'date';
-    if (typeof value === 'object') return 'object';
-    if (typeof value === 'boolean') return 'boolean';
-    if (typeof value === 'number') return 'number';
-    return 'text';
-  };
-
-  const detectTableStructure = (data) => {
-    const schema = {};
-    data.forEach(item => {
-      Object.entries(item).forEach(([key, value]) => {
-        if (!isHiddenField(key)) {
-          if (!schema[key]) {
-            schema[key] = detectColumnType(key, value);
-          }
-        }
+const fetchData = () => {
+    setLoading(true);
+    fetch("https://o2merk3yse.execute-api.us-east-1.amazonaws.com/dev/data")
+      .then((res) => res.json())
+      .then((data) => {
+        setLoading(false);
+        const groupedData = groupAndGenerateColumns(data);
+        setTablesData(groupedData);
+        setFilteredData(groupedData);
+        checkForCriticalData(groupedData);
+      })
+      .catch((err) => {
+        setLoading(false);
+        console.error("Couldn't fetch data", err);
       });
-    });
-    return schema;
   };
 
-  const processTablesData = (data) => {
-    // Group data by table_name
-    const groupedData = data.reduce((acc, item) => {
-      const tableName = item.table_name;
+  const groupAndGenerateColumns = (data) => {
+    const groups = data.reduce((acc, item) => {
+      const tableName = item.table_name || getDetermineTableType(item);
       if (!acc[tableName]) {
-        acc[tableName] = {
-          data: [],
-          schema: null,
-        };
+        acc[tableName] = { data: [], keys: new Set() };
       }
-      acc[tableName].data.push(item);
+      
+      const { table_name, ...itemWithoutTableName } = item;
+      acc[tableName].data.push(itemWithoutTableName);
+      
+      Object.keys(itemWithoutTableName).forEach((key) => {
+        acc[tableName].keys.add(key);
+      });
       return acc;
     }, {});
 
-    // Process each table
-    Object.keys(groupedData).forEach(tableName => {
-      groupedData[tableName].schema = detectTableStructure(groupedData[tableName].data);
+    const columnConfigs = {
+      backup_status: {
+        order: ['hostname', 'backup_status', 'last_backup_date', 'next_backup_date'],
+        titles: {
+          hostname: 'Hostname',
+          backup_status: 'Backup Status',
+          last_backup_date: 'Last Backup Date',
+          next_backup_date: 'Next Backup Date'
+        }
+      },
+      ssl_status: {
+        order: ['domain', 'certificate_issued', 'certificate_expiry', 'days_to_expiry', 'status', 'check_date'],
+        titles: {
+          domain: 'Domain',
+          certificate_issued: 'Certificate Issued',
+          certificate_expiry: 'Certificate Expiry',
+          days_to_expiry: 'Days to Expiry',
+          status: 'Status',
+          check_date: 'Last Check Date'
+        }
+      }
+    };
+
+    Object.keys(groups).forEach((tableName) => {
+      const config = columnConfigs[tableName];
+      if (config) {
+        groups[tableName].columns = config.order
+          .filter(key => groups[tableName].keys.has(key))
+          .map(key => ({
+            title: config.titles[key] || key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
+            dataIndex: key,
+            key: key
+          }));
+      } else {
+        groups[tableName].columns = Array.from(groups[tableName].keys).map(key => ({
+          title: key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
+          dataIndex: key,
+          key: key
+        }));
+      }
     });
 
-    return groupedData;
+    return groups;
   };
 
-  const fetchData = async () => {
-    setLoading(true);
-    try {
-      const response = await fetch("https://o2merk3yse.execute-api.us-east-1.amazonaws.com/dev/data");
-      const data = await response.json();
-      const processedData = processTablesData(data);
-      setTablesData(processedData);
-      setFilteredData(processedData);
-      checkForCriticalData(processedData);
-    } catch (error) {
-      console.error("Error fetching data:", error);
-      setAlertMessage("Failed to fetch data. Please try again.");
+  const getDetermineTableType = (item) => {
+    if (item.hasOwnProperty('backup_status')) {
+      return 'backup_status';
+    }
+    if (item.hasOwnProperty('certificate_expiry') || item.hasOwnProperty('days_to_expiry')) {
+      return 'ssl_status';
+    }
+    return 'unknown';
+  };
+
+  const checkForCriticalData = (data) => {
+    let foundCriticalData = false;
+    Object.keys(data).forEach((tableName) => {
+      data[tableName].data.forEach((row) => {
+        if (row.backup_status === "Fail" || row.status === "expired") {
+          foundCriticalData = true;
+        }
+      });
+    });
+
+    if (foundCriticalData) {
+      setAlertMessage("Critical alert: Failed backups or expired certificates found!");
       setOpenSnackbar(true);
-    } finally {
-      setLoading(false);
     }
-  };
-
-  const renderCellContent = (key, value, type) => {
-    if (value == null) return "";
-
-    switch (type) {
-      case 'status':
-        return (
-          <Chip
-            label={value}
-            color={getStatusColor(value)}
-            style={{ fontWeight: "bold", color: "#ffffff" }}
-          />
-        );
-      case 'date':
-        try {
-          const date = new Date(value);
-          return date.toLocaleString();
-        } catch {
-          return value.toString();
-        }
-      case 'object':
-        if (typeof value === 'object') {
-          if (value.commonName || value.organizationName) {
-            return value.commonName || value.organizationName || 'N/A';
-          }
-          return JSON.stringify(value);
-        }
-        return value.toString();
-      case 'boolean':
-        return value ? 'Yes' : 'No';
-      case 'number':
-        return value.toLocaleString();
-      default:
-        return value.toString();
-    }
-  };
-
-  const getStatusColor = (status) => {
-    if (!status) return "default";
-    
-    status = status.toString().toLowerCase();
-    const errorStatuses = ['fail', 'failed', 'error', 'expired', 'critical'];
-    const warningStatuses = ['warning', 'pending', 'in progress'];
-    const successStatuses = ['success', 'pass', 'passed', 'valid', 'active'];
-
-    if (errorStatuses.some(s => status.includes(s))) return "error";
-    if (warningStatuses.some(s => status.includes(s))) return "warning";
-    if (successStatuses.some(s => status.includes(s))) return "success";
-    return "default";
   };
 
   const handleSearch = () => {
@@ -272,43 +247,16 @@ const App = () => {
 
     const tableData = tablesData[selectedTable]?.data || [];
     const filteredTableData = tableData.filter((item) =>
-      Object.entries(item).some(([key, value]) => {
-        if (isHiddenField(key)) return false;
-        if (value == null) return false;
-        return value.toString().toLowerCase().includes(searchText.toLowerCase());
-      })
+      Object.values(item).some((value) =>
+        value && value.toString().toLowerCase().includes(searchText.toLowerCase())
+      )
     );
 
     setFilteredData({
       ...filteredData,
-      [selectedTable]: {
-        ...tablesData[selectedTable],
-        data: filteredTableData,
-      },
+      [selectedTable]: { ...tablesData[selectedTable], data: filteredTableData },
     });
     setPage(0);
-  };
-
-  const checkForCriticalData = (data) => {
-    let foundCriticalData = false;
-    Object.values(data).forEach(table => {
-      table.data.forEach(row => {
-        Object.entries(row).forEach(([key, value]) => {
-          if (typeof value === 'string' && key.toLowerCase().includes('status')) {
-            const status = value.toLowerCase();
-            if (status.includes('fail') || status.includes('error') || 
-                status.includes('expired') || status.includes('critical')) {
-              foundCriticalData = true;
-            }
-          }
-        });
-      });
-    });
-
-    if (foundCriticalData) {
-      setAlertMessage("Critical alert: Issues found in the data!");
-      setOpenSnackbar(true);
-    }
   };
 
   const handleDarkModeToggle = () => setDarkMode(!darkMode);
@@ -332,30 +280,14 @@ const App = () => {
 
   const exportToCSV = async () => {
     if (!selectedTable || !tablesData[selectedTable]) return;
-    try {
-      const dataToExport = tablesData[selectedTable].data.map(row => {
-        const exportRow = {};
-        Object.entries(row).forEach(([key, value]) => {
-          if (!isHiddenField(key)) {
-            exportRow[formatFieldName(key)] = typeof value === 'object' ? 
-              JSON.stringify(value) : value;
-          }
-        });
-        return exportRow;
-      });
-
-      const csvData = await json2csv(dataToExport);
-      const blob = new Blob([csvData], { type: "text/csv" });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = `${selectedTable}_${new Date().toISOString()}.csv`;
-      link.click();
-    } catch (error) {
-      console.error("Error exporting CSV:", error);
-      setAlertMessage("Failed to export data. Please try again.");
-      setOpenSnackbar(true);
-    }
+    
+    const csvData = await json2csv(tablesData[selectedTable].data || []);
+    const blob = new Blob([csvData], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `${selectedTable}_data.csv`;
+    link.click();
   };
 
   useEffect(() => {
@@ -369,18 +301,7 @@ const App = () => {
     if (selectedTable) {
       handleSearch();
     }
-  }, [searchText, selectedTable]);
-
-  const getVisibleColumns = (tableName) => {
-    if (!tablesData[tableName]?.schema) return [];
-    return Object.entries(tablesData[tableName].schema)
-      .filter(([key]) => !isHiddenField(key))
-      .map(([key, type]) => ({
-        key,
-        title: formatFieldName(key),
-        type
-      }));
-  };
+  }, [searchText, selectedTable, tablesData]);
 
   const paginatedData = selectedTable
     ? (filteredData[selectedTable]?.data || []).slice(
@@ -397,7 +318,6 @@ const App = () => {
         transition={{ duration: 0.5 }}
         style={{
           display: "flex",
-          flexDirection: "column",
           alignItems: "center",
           justifyContent: "center",
           height: "100vh",
@@ -420,7 +340,7 @@ const App = () => {
             <LogoIcon />
             <Title variant="h5">Dave - Dashboard</Title>
           </Logo>
-          <div style={{ position: "absolute", right: 20, display: "flex", alignItems: "center" }}>
+          <div style={{ position: "absolute", right: 0, display: "flex", alignItems: "center" }}>
             <Typography variant="body2" style={{ color: "#ffffff", marginRight: 8, fontSize: "0.85rem" }}>
               Dark Mode
             </Typography>
@@ -458,7 +378,7 @@ const App = () => {
               </MenuItem>
               {Object.keys(tablesData).map((tableName) => (
                 <MenuItem key={tableName} value={tableName}>
-                  {formatFieldName(tableName)}
+                  {tableName.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
                 </MenuItem>
               ))}
             </Select>
@@ -468,7 +388,7 @@ const App = () => {
             <TextField
               placeholder="Search Table"
               variant="outlined"
-              onChange={(e) => setSearchText(e.target.value)}
+              onChange={(e) => setSearchText(e.target.value.toLowerCase())}
               value={searchText}
               style={{
                 width: 300,
@@ -520,16 +440,16 @@ const App = () => {
             <Table>
               <TableHead>
                 <TableRow style={{ backgroundColor: "#036649" }}>
-                  {selectedTable && getVisibleColumns(selectedTable).map((column) => (
+                  {selectedTable && tablesData[selectedTable]?.columns.map((col) => (
                     <TableCell
-                      key={column.key}
+                      key={col.key}
                       style={{
                         color: "#ffffff",
                         fontWeight: "bold",
                         padding: "8px",
                       }}
                     >
-                      {column.title}
+                      {col.title}
                     </TableCell>
                   ))}
                 </TableRow>
@@ -545,23 +465,31 @@ const App = () => {
                     style={{
                       backgroundColor: darkMode ? "#333333" : "#ffffff",
                       cursor: "pointer",
+                      transition: "background-color 0.3s ease",
                     }}
                     onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = darkMode ? "#444444" : "#f1f1f1")}
                     onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = darkMode ? "#333333" : "#ffffff")}
                     onClick={() => handleRowClick(row)}
                   >
-                    {getVisibleColumns(selectedTable).map((column) => (
+                    {tablesData[selectedTable]?.columns.map((col) => (
                       <TableCell
-                        key={column.key}
+                        key={col.key}
                         style={{
                           padding: "8px",
                           maxWidth: "300px",
                           whiteSpace: "normal",
                           wordBreak: "break-word",
-                          color: darkMode ? "#ffffff" : "inherit",
                         }}
                       >
-                        {renderCellContent(column.key, row[column.key], column.type)}
+                        {col.key === "backup_status" || col.key === "status" ? (
+                          <Chip
+                            label={row[col.key]}
+                            color={row[col.key] === "Fail" || row[col.key] === "expired" ? "error" : "success"}
+                            style={{ fontWeight: "bold", color: "#ffffff" }}
+                          />
+                        ) : (
+                          row[col.key]
+                        )}
                       </TableCell>
                     ))}
                   </TableRow>
@@ -581,48 +509,26 @@ const App = () => {
           </TableContainer>
         )}
 
-        <Dialog
-          open={openDialog}
-          onClose={handleCloseDialog}
-          fullWidth
-          maxWidth="sm"
-          PaperProps={{
-            style: {
-              backgroundColor: darkMode ? "#333333" : "#ffffff",
-              color: darkMode ? "#ffffff" : "inherit",
-            },
-          }}
-        >
+        <Dialog open={openDialog} onClose={handleCloseDialog} fullWidth maxWidth="sm">
           <DialogTitle>
             Row Details
-            <IconButton
-              onClick={handleCloseDialog}
-              style={{
-                position: "absolute",
-                right: 10,
-                top: 10,
-                color: darkMode ? "#ffffff" : "inherit",
-              }}
+            <IconButton 
+              onClick={handleCloseDialog} 
+              style={{ position: "absolute", right: 10, top: 10 }}
             >
               <CloseIcon />
             </IconButton>
           </DialogTitle>
           <DialogContent dividers>
-            {selectedRow && getVisibleColumns(selectedTable).map((column) => (
-              <Typography
-                key={column.key}
-                style={{
-                  marginBottom: 10,
-                  color: darkMode ? "#ffffff" : "inherit",
-                }}
-              >
-                <strong>{column.title}:</strong>{' '}
-                {renderCellContent(column.key, selectedRow[column.key], column.type)}
-              </Typography>
-            ))}
+            {selectedRow &&
+              Object.entries(selectedRow).map(([key, value]) => (
+                <Typography key={key} style={{ marginBottom: 10 }}>
+                  <strong>{key.replace(/_/g, " ")}:</strong> {value}
+                </Typography>
+              ))}
           </DialogContent>
           <DialogActions>
-            <Button onClick={handleCloseDialog} style={{ color: "#036649" }}>
+            <Button onClick={handleCloseDialog} color="primary">
               Close
             </Button>
           </DialogActions>

@@ -105,7 +105,7 @@ const Title = styled(Typography)(({ theme }) => ({
   fontFamily: "Poppins, sans-serif",
 }));
 
-// Helper Functions
+// Helper function to format field names
 const formatFieldName = (field) => {
   return field
     .replace(/_/g, ' ')
@@ -113,77 +113,10 @@ const formatFieldName = (field) => {
     .trim();
 };
 
+// Helper function to determine if a field should be hidden
 const isHiddenField = (field) => {
-  const hiddenFields = ['table_name'];
+  const hiddenFields = ['table_name', 'id', '_id'];
   return hiddenFields.includes(field.toLowerCase());
-};
-
-const detectColumnType = (key, value) => {
-  const keyLower = key.toLowerCase();
-  if (keyLower.includes('status')) return 'status';
-  if (keyLower.includes('date') || keyLower.includes('time')) return 'date';
-  if (keyLower.includes('id') && !keyLower.includes('guid')) return 'id';
-  if (typeof value === 'object') return 'object';
-  if (typeof value === 'boolean') return 'boolean';
-  if (typeof value === 'number') return 'number';
-  return 'text';
-};
-
-const sortByDaysToExpiry = (data) => {
-  if (!data || !Array.isArray(data)) return [];
-  return [...data].sort((a, b) => {
-    const daysA = a.days_to_expiry ?? Number.MAX_VALUE;
-    const daysB = b.days_to_expiry ?? Number.MAX_VALUE;
-    return daysA - daysB;
-  });
-};
-
-const detectTableStructure = (data) => {
-  if (!data || data.length === 0) return { schema: {}, columnOrder: [] };
-  
-  const schema = {};
-  const firstItem = data[0];
-  const columnOrder = Object.keys(firstItem).filter(key => !isHiddenField(key));
-  
-  data.forEach(item => {
-    Object.entries(item).forEach(([key, value]) => {
-      if (!isHiddenField(key)) {
-        if (!schema[key]) {
-          schema[key] = detectColumnType(key, value);
-        }
-      }
-    });
-  });
-  
-  return { schema, columnOrder };
-};
-
-const processTablesData = (data) => {
-  const groupedData = data.reduce((acc, item) => {
-    const tableName = item.table_name;
-    if (!acc[tableName]) {
-      acc[tableName] = {
-        data: [],
-        schema: null,
-        columnOrder: [],
-      };
-    }
-    acc[tableName].data.push(item);
-    return acc;
-  }, {});
-
-  Object.keys(groupedData).forEach(tableName => {
-    const { schema, columnOrder } = detectTableStructure(groupedData[tableName].data);
-    groupedData[tableName].schema = schema;
-    groupedData[tableName].columnOrder = columnOrder;
-    
-    // Only sort if it's the veeam-job-status table
-    if (tableName === 'ssl_cert_check') {
-      groupedData[tableName].data = sortByDaysToExpiry(groupedData[tableName].data);
-    }
-  });
-
-  return groupedData;
 };
 
 const App = () => {
@@ -201,6 +134,7 @@ const App = () => {
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
 
+  // Theme configurations
   const lightTheme = createTheme({
     palette: {
       mode: "light",
@@ -219,6 +153,69 @@ const App = () => {
       text: { primary: "#ffffff" },
     },
   });
+
+  const detectColumnType = (key, value) => {
+    if (key.toLowerCase().includes('status')) return 'status';
+    if (key.toLowerCase().includes('date') || key.toLowerCase().includes('time')) return 'date';
+    if (typeof value === 'object') return 'object';
+    if (typeof value === 'boolean') return 'boolean';
+    if (typeof value === 'number') return 'number';
+    return 'text';
+  };
+
+  const detectTableStructure = (data) => {
+    const schema = {};
+    data.forEach(item => {
+      Object.entries(item).forEach(([key, value]) => {
+        if (!isHiddenField(key)) {
+          if (!schema[key]) {
+            schema[key] = detectColumnType(key, value);
+          }
+        }
+      });
+    });
+    return schema;
+  };
+
+  const processTablesData = (data) => {
+    // Group data by table_name
+    const groupedData = data.reduce((acc, item) => {
+      const tableName = item.table_name;
+      if (!acc[tableName]) {
+        acc[tableName] = {
+          data: [],
+          schema: null,
+        };
+      }
+      acc[tableName].data.push(item);
+      return acc;
+    }, {});
+
+    // Process each table
+    Object.keys(groupedData).forEach(tableName => {
+      groupedData[tableName].schema = detectTableStructure(groupedData[tableName].data);
+    });
+
+    return groupedData;
+  };
+
+  const fetchData = async () => {
+    setLoading(true);
+    try {
+      const response = await fetch("https://o2merk3yse.execute-api.us-east-1.amazonaws.com/dev/data");
+      const data = await response.json();
+      const processedData = processTablesData(data);
+      setTablesData(processedData);
+      setFilteredData(processedData);
+      checkForCriticalData(processedData);
+    } catch (error) {
+      console.error("Error fetching data:", error);
+      setAlertMessage("Failed to fetch data. Please try again.");
+      setOpenSnackbar(true);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const renderCellContent = (key, value, type) => {
     if (value == null) return "";
@@ -239,8 +236,6 @@ const App = () => {
         } catch {
           return value.toString();
         }
-      case 'id':
-        return <span style={{ fontFamily: 'monospace' }}>{value}</span>;
       case 'object':
         if (typeof value === 'object') {
           if (value.commonName || value.organizationName) {
@@ -272,24 +267,6 @@ const App = () => {
     return "default";
   };
 
-  const fetchData = async () => {
-    setLoading(true);
-    try {
-      const response = await fetch("https://o2merk3yse.execute-api.us-east-1.amazonaws.com/dev/data");
-      const data = await response.json();
-      const processedData = processTablesData(data);
-      setTablesData(processedData);
-      setFilteredData(processedData);
-      checkForCriticalData(processedData);
-    } catch (error) {
-      console.error("Error fetching data:", error);
-      setAlertMessage("Failed to fetch data. Please try again.");
-      setOpenSnackbar(true);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const handleSearch = () => {
     if (!selectedTable) return;
 
@@ -302,15 +279,11 @@ const App = () => {
       })
     );
 
-    const processedData = selectedTable === 'veeam-job-status' 
-      ? sortByDaysToExpiry(filteredTableData)
-      : filteredTableData;
-
     setFilteredData({
       ...filteredData,
       [selectedTable]: {
         ...tablesData[selectedTable],
-        data: processedData,
+        data: filteredTableData,
       },
     });
     setPage(0);
@@ -398,15 +371,14 @@ const App = () => {
     }
   }, [searchText, selectedTable]);
 
-  const getVisibleColumns = (tableData) => {
-    if (!tableData?.schema || !tableData?.columnOrder) return [];
-    
-    return tableData.columnOrder
-      .filter(key => !isHiddenField(key))
-      .map(key => ({
+  const getVisibleColumns = (tableName) => {
+    if (!tablesData[tableName]?.schema) return [];
+    return Object.entries(tablesData[tableName].schema)
+      .filter(([key]) => !isHiddenField(key))
+      .map(([key, type]) => ({
         key,
         title: formatFieldName(key),
-        type: tableData.schema[key]
+        type
       }));
   };
 
@@ -548,7 +520,7 @@ const App = () => {
             <Table>
               <TableHead>
                 <TableRow style={{ backgroundColor: "#036649" }}>
-                  {selectedTable && getVisibleColumns(tablesData[selectedTable]).map((column) => (
+                  {selectedTable && getVisibleColumns(selectedTable).map((column) => (
                     <TableCell
                       key={column.key}
                       style={{
@@ -578,7 +550,7 @@ const App = () => {
                     onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = darkMode ? "#333333" : "#ffffff")}
                     onClick={() => handleRowClick(row)}
                   >
-                    {getVisibleColumns(tablesData[selectedTable]).map((column) => (
+                    {getVisibleColumns(selectedTable).map((column) => (
                       <TableCell
                         key={column.key}
                         style={{
@@ -636,7 +608,7 @@ const App = () => {
             </IconButton>
           </DialogTitle>
           <DialogContent dividers>
-            {selectedRow && getVisibleColumns(tablesData[selectedTable]).map((column) => (
+            {selectedRow && getVisibleColumns(selectedTable).map((column) => (
               <Typography
                 key={column.key}
                 style={{
@@ -669,7 +641,7 @@ const App = () => {
 
         <FooterContainer>
           <Typography variant="body2">
-            © 2024 Dave Dashboard
+            © 2024 Dave Dashboard | Streamlined Data Insights
           </Typography>
           <Typography variant="body2" style={{ fontSize: "0.8rem" }}>
             Built by IT Team

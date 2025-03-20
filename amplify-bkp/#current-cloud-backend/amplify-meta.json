@@ -1,0 +1,112 @@
+{
+  "providers": {
+    "awscloudformation": {
+      "AuthRoleName": "amplify-dynamodbdisplay-dev-dfc21-authRole",
+      "UnauthRoleArn": "arn:aws:iam::481665122364:role/amplify-dynamodbdisplay-dev-dfc21-unauthRole",
+      "AuthRoleArn": "arn:aws:iam::481665122364:role/amplify-dynamodbdisplay-dev-dfc21-authRole",
+      "Region": "us-east-1",
+      "DeploymentBucketName": "amplify-dynamodbdisplay-dev-dfc21-deployment",
+      "UnauthRoleName": "amplify-dynamodbdisplay-dev-dfc21-unauthRole",
+      "StackName": "amplify-dynamodbdisplay-dev-dfc21",
+      "StackId": "arn:aws:cloudformation:us-east-1:481665122364:stack/amplify-dynamodbdisplay-dev-dfc21/7fe40700-9289-11ef-a891-0affea73130b",
+      "AmplifyAppId": "d3jv1hbji3r78v",
+      "APIGatewayAuthURL": "https://s3.amazonaws.com/amplify-dynamodbdisplay-dev-dfc21-deployment/amplify-cfn-templates/api/APIGatewayAuthStack.json"
+    }
+  },
+  "function": {
+    "dynamodbdisplay39142c33": {
+      "build": true,
+      "providerPlugin": "awscloudformation",
+      "service": "Lambda",
+      "lastBuildTimeStamp": "2024-10-25T04:33:38.076Z",
+      "lastBuildType": "PROD",
+      "lastPackageTimeStamp": "2024-10-25T04:33:38.594Z",
+      "distZipFilename": "dynamodbdisplay39142c33-6461364e506f61786677-build.zip",
+      "s3Bucket": {
+        "deploymentBucketName": "amplify-dynamodbdisplay-dev-dfc21-deployment",
+        "s3Key": "amplify-builds/dynamodbdisplay39142c33-6461364e506f61786677-build.zip"
+      },
+      "providerMetadata": {
+        "s3TemplateURL": "https://s3.amazonaws.com/amplify-dynamodbdisplay-dev-dfc21-deployment/amplify-cfn-templates/function/dynamodbdisplay39142c33-cloudformation-template.json",
+        "logicalId": "functiondynamodbdisplay39142c33"
+      },
+      "lastPushTimeStamp": "2024-10-25T04:35:36.927Z",
+      "output": {
+        "LambdaExecutionRoleArn": "arn:aws:iam::481665122364:role/dynamodbdisplayLambdaRole85a2fe79-dev",
+        "Region": "us-east-1",
+        "Arn": "arn:aws:lambda:us-east-1:481665122364:function:dynamodbdisplay39142c33-dev",
+        "Name": "dynamodbdisplay39142c33-dev",
+        "LambdaExecutionRole": "dynamodbdisplayLambdaRole85a2fe79-dev"
+      },
+      "lastPushDirHash": "z8jKwM6MO8PoUXDdyomdwvDnSN8="
+    }
+  },
+  "auth": {
+    "dynamodbdisplay": {
+      "service": "Cognito",
+      "serviceType": "managed",
+      "providerPlugin": "awscloudformation",
+      "dependsOn": [],
+      "frontendAuthConfig": {
+        "socialProviders": [],
+        "usernameAttributes": [],
+        "signupAttributes": [
+          "EMAIL"
+        ],
+        "passwordProtectionSettings": {
+          "passwordPolicyMinLength": 8,
+          "passwordPolicyCharacters": []
+        },
+        "mfaConfiguration": "OFF",
+        "mfaTypes": [
+          "SMS"
+        ],
+        "verificationMechanisms": [
+          "EMAIL"
+        ]
+      },
+      "providerMetadata": {
+        "s3TemplateURL": "https://s3.amazonaws.com/amplify-dynamodbdisplay-dev-dfc21-deployment/amplify-cfn-templates/auth/dynamodbdisplay-cloudformation-template.json",
+        "logicalId": "authdynamodbdisplay"
+      },
+      "lastPushTimeStamp": "2024-10-25T04:35:36.927Z",
+      "output": {
+        "UserPoolId": "us-east-1_2UV67Th7k",
+        "AppClientIDWeb": "2urb50i9kuml0dj040cgqnflsh",
+        "AppClientID": "30k2gb56vn90g2lqk1s0kjgoud",
+        "IdentityPoolId": "us-east-1:c1a290c5-4588-4e64-bf0c-c604cf6cc1c3",
+        "UserPoolArn": "arn:aws:cognito-idp:us-east-1:481665122364:userpool/us-east-1_2UV67Th7k",
+        "IdentityPoolName": "dynamodbdisplay_identitypool_a9367768__dev",
+        "UserPoolName": "dynamodbdisplay_userpool_a9367768"
+      },
+      "lastPushDirHash": "dpgET6xumFXemZvmtDzDGOCE6MM="
+    }
+  },
+  "api": {
+    "api5c555dfd": {
+      "service": "API Gateway",
+      "providerPlugin": "awscloudformation",
+      "dependsOn": [
+        {
+          "category": "function",
+          "resourceName": "dynamodbdisplay39142c33",
+          "attributes": [
+            "Name",
+            "Arn"
+          ]
+        }
+      ],
+      "providerMetadata": {
+        "s3TemplateURL": "https://s3.amazonaws.com/amplify-dynamodbdisplay-dev-dfc21-deployment/amplify-cfn-templates/api/api5c555dfd-cloudformation-template.json",
+        "logicalId": "apiapi5c555dfd"
+      },
+      "lastPushTimeStamp": "2024-10-25T04:35:36.927Z",
+      "output": {
+        "ApiName": "api5c555dfd",
+        "RootUrl": "https://bn6bsd3y2k.execute-api.us-east-1.amazonaws.com/dev",
+        "ApiId": "bn6bsd3y2k"
+      },
+      "lastPushDirHash": "aFCa/P5fba98XEAXv18PoV1i4kM="
+    }
+  }
+}

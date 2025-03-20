@@ -553,7 +553,7 @@ function AthenaDashboard() {
                 Select Table
               </MenuItem>
               <MenuItem value="csv_data">Storage Metrics</MenuItem>
-              <MenuItem value="2025_03_19_restorepoints">Veeam Backups</MenuItem>
+              <MenuItem value="2025_03_19_restorepoints">Veeam Restore Points</MenuItem>
               <MenuItem value="2025_03_19_backupstatus">Backup Status</MenuItem>
             </Select>
           </Tooltip>

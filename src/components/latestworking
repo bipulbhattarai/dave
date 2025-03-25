@@ -180,37 +180,6 @@ const getStatusColor = (status) => {
   return 'default';
 };
 
-// const renderCellContent = (key, value, type) => {
-//   if (value == null) return '';
-
-//   switch (type) {
-//     case 'status':
-//       return (
-//         <Chip
-//           label={value}
-//           color={getStatusColor(value)}
-//           style={{ fontWeight: 'bold', color: '#ffffff' }}
-//         />
-//       );
-//     case 'date':
-//       try {
-//         const date = new Date(value);
-//         return date.toLocaleString();
-//       } catch {
-//         return value.toString();
-//       }
-//     case 'id':
-//       return <span style={{ fontFamily: 'monospace' }}>{value}</span>;
-//     case 'object':
-//       return typeof value === 'object' ? JSON.stringify(value) : value.toString();
-//     case 'boolean':
-//       return value ? 'True' : 'False';
-//     case 'number':
-//       return Number(value).toLocaleString();
-//     default:
-//       return value.toString();
-//   }
-// };
 const renderCellContent = (key, value, type) => {
   if (value == null) return '';
 
@@ -236,41 +205,19 @@ const renderCellContent = (key, value, type) => {
       return typeof value === 'object' ? JSON.stringify(value) : value.toString();
     case 'boolean':
       return value ? 'True' : 'False';
-    case 'number': {
-      // If the field name is year, month, or week, show the raw number (no commas).
-      // Otherwise, use toLocaleString for user-friendly formatting.
-      const lowerKey = key.toLowerCase();
-      const rawNumber = Number(value);
-
-      // If for some reason rawNumber is not a valid number, just return as-is:
-      if (isNaN(rawNumber)) return value.toString();
-
-      if (
-        lowerKey.includes('year') ||
-        lowerKey.includes('month') ||
-        lowerKey.includes('week')
-      ) {
-        // Return the raw integer or float without commas
-        return value;
-      } else {
-        // Use comma formatting for other numeric fields
-        return rawNumber.toLocaleString();
-      }
-    }
+    case 'number':
+      return Number(value).toLocaleString();
     default:
       return value.toString();
   }
-}; 
-
-
+};
 
 function AthenaDashboard() {
   const [tableData, setTableData] = useState({ data: [], schema: {}, columnOrder: [] });
   const [filteredData, setFilteredData] = useState({ data: [], schema: {}, columnOrder: [] });
   const [loading, setLoading] = useState(false);
   const [loadingPage, setLoadingPage] = useState(true);
-  // Default table is netapp_monitoring001 (Data Center Storage Matrics)
-  const [selectedTable, setSelectedTable] = useState('netapp_monitoring001');
+  const [selectedTable, setSelectedTable] = useState('');
   const [searchText, setSearchText] = useState('');
   const [darkMode, setDarkMode] = useState(false);
 
@@ -283,7 +230,7 @@ function AthenaDashboard() {
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
 
-  // Filter states for netapp_monitoring001 (Data Center Storage Matrics)
+  // Filter states for csv_data
   const [selectedYear, setSelectedYear] = useState('');
   const [selectedMonth, setSelectedMonth] = useState('');
   const [selectedCluster, setSelectedCluster] = useState('');
@@ -332,7 +279,18 @@ function AthenaDashboard() {
     if (selectedTable) {
       handleFilter();
     }
-  }, [selectedTable, searchText, selectedYear, selectedMonth, selectedCluster, selectedVeeamServer, selectedVMName, selectedVCenter, selectedBackupVMName, selectedShouldBackup]);
+  }, [
+    selectedTable,
+    searchText,
+    selectedYear,
+    selectedMonth,
+    selectedCluster,
+    selectedVeeamServer,
+    selectedVMName,
+    selectedVCenter,
+    selectedBackupVMName,
+    selectedShouldBackup,
+  ]);
 
   const fetchData = async () => {
     if (!selectedTable) return;
@@ -352,28 +310,37 @@ function AthenaDashboard() {
       setAlertMessage('Failed to fetch data. Using sample data...');
       setOpenSnackbar(true);
 
-      // Fallback sample for demonstration (adjust as needed)
-      const sampleData = [
-        {
-          'cluster name': 'DC-Cluster01',
-          'aggregate name': 'Aggregate_A',
-          'node name': 'Node_1',
-          'total capacity (gb)': '1000',
-          'used capacity (gb)': '750',
-          'used data %': '75.0',
-          'available capacity (gb)': '250',
-          'available data %': '25.0',
-          'raid type': 'RAID-DP',
-          'disk count': '20',
-          'aggregate state': 'Healthy',
-          'snaplock type': 'None',
-          'space full threshold (%)': '90',
-          'partition_0': 'Primary',
-          'year': '2022',
-          'month': '08',
-          'week': '34'
-        },
-      ];
+      const sampleData =
+        selectedTable === 'csv_data'
+          ? [
+              {
+                'cluster name': 'lin-netapp01',
+                'aggregate name': 'n01_a01',
+                type: 'SSD',
+                year: '2020',
+                month: '02',
+                'used data %': '69.3',
+                'available data %': '30.7',
+              },
+            ]
+          : selectedTable === '2025_03_19_restorepoints'
+          ? [
+              {
+                veeamserver: 'server1',
+                vmname: 'vm1',
+                restorepoints: '5',
+                col3: '100',
+              },
+            ]
+          : selectedTable === '2025_03_19_backupstatus'
+          ? [
+              {
+                vcenter: 'vcenter1',
+                vmname: 'vm2',
+                shouldbackup: true,
+              },
+            ]
+          : [];
       const { schema, columnOrder } = detectTableStructure(sampleData);
       const processedFallback = { data: sampleData, schema, columnOrder };
       setTableData(processedFallback);
@@ -411,8 +378,7 @@ function AthenaDashboard() {
           })
         : true;
 
-      // For Data Center Storage Matrics (netapp_monitoring001)
-      if (selectedTable === 'netapp_monitoring001') {
+      if (selectedTable === 'csv_data') {
         const matchesYear = selectedYear ? row.year === selectedYear : true;
         const matchesMonth = selectedMonth ? row.month === selectedMonth : true;
         const matchesCluster = selectedCluster ? row['cluster name'] === selectedCluster : true;
@@ -441,8 +407,8 @@ function AthenaDashboard() {
     const typeMap = {};
     fullRows.forEach((row) => {
       let t;
-      if (selectedTable === 'netapp_monitoring001') {
-        t = row["raid type"] || 'Unknown';
+      if (selectedTable === 'csv_data') {
+        t = row.type || 'Unknown';
       } else if (selectedTable === '2025_03_19_restorepoints') {
         t = row.restorepoints || 'Unknown';
       } else if (selectedTable === '2025_03_19_backupstatus') {
@@ -457,9 +423,9 @@ function AthenaDashboard() {
 
   const lineChartData = React.useMemo(() => {
     return fullRows.slice(0, 10).map((row, idx) => ({
-      name: row['aggregate name'] || `Item ${idx + 1}`,
+      name: row['aggregate name'] || row.vmname || `Item ${idx + 1}`,
       value:
-        selectedTable === 'netapp_monitoring001'
+        selectedTable === 'csv_data'
           ? parseFloat(row['used data %']) || 0
           : selectedTable === '2025_03_19_restorepoints'
           ? parseFloat(row.col3) || 0
@@ -586,14 +552,14 @@ function AthenaDashboard() {
               <MenuItem value="" disabled>
                 Select Table
               </MenuItem>
-              {/* Removed csv_data option; renamed netapp_monitoring001 */}
-              <MenuItem value="netapp_monitoring001">Data Center Storage Matrics</MenuItem>
+              <MenuItem value="csv_data">Lan Storage Metrics</MenuItem>
+              <MenuItem value="netapp_monitoring001">Lin Storage Metrics</MenuItem>
               <MenuItem value="2025_03_19_restorepoints">Veeam Restore Points</MenuItem>
               <MenuItem value="2025_03_19_backupstatus">Backup Status</MenuItem>
             </Select>
           </Tooltip>
 
-          {selectedTable === 'netapp_monitoring001' && (
+          {selectedTable === 'csv_data' && (
             <>
               <Tooltip title="Filter by Year">
                 <Select
@@ -901,8 +867,8 @@ function AthenaDashboard() {
             <Box display="flex" flexWrap="wrap" gap={2}>
               <Paper style={{ flex: 1, minWidth: 300, padding: 16 }} elevation={3}>
                 <Typography variant="subtitle1" gutterBottom>
-                  {selectedTable === 'netapp_monitoring001'
-                    ? 'Raid Type Distribution'
+                  {selectedTable === 'csv_data'
+                    ? 'Storage Type Distribution'
                     : selectedTable === '2025_03_19_restorepoints'
                     ? 'Restore Points Distribution'
                     : 'Should Backup Distribution'}
@@ -935,7 +901,7 @@ function AthenaDashboard() {
 
               <Paper style={{ flex: 1, minWidth: 300, padding: 16 }} elevation={3}>
                 <Typography variant="subtitle1" gutterBottom>
-                  {selectedTable === 'netapp_monitoring001'
+                  {selectedTable === 'csv_data'
                     ? 'Used Data % (Line Chart)'
                     : selectedTable === '2025_03_19_restorepoints'
                     ? 'Col3 Value (Line Chart)'
@@ -958,7 +924,7 @@ function AthenaDashboard() {
                         stroke="#8884d8"
                         strokeWidth={2}
                         name={
-                          selectedTable === 'netapp_monitoring001'
+                          selectedTable === 'csv_data'
                             ? 'Used Data %'
                             : selectedTable === '2025_03_19_restorepoints'
                             ? 'Col3'

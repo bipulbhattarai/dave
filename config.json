@@ -1,0 +1,17 @@
+{
+    "subscription_id": "9a12b875-2c0d-441d-9968-6d2fd6f297a6",
+    "resource_group": "rg-datawarehouse-prod-01",
+    "workspace_name": "ML-datawarehouse-prod-01"
+  }
+  
+
+
+  ENVIRONMENT
+DEV
+FRESHDESK_API_KEY
+XwGHeDK0R4LDzR7PcmIg
+FRESHDESK_DOMAIN
+neogenservicedesk.freshservice.com
+
+SAP_HANA_DB_AUTO_BACKUP
+mi-0b92102f0bff6c753
